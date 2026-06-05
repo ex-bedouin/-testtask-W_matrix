@@ -3,58 +3,106 @@ import cmath
 from scipy.linalg import norm
 from scipy.stats import unitary_group
 
-def angle_and_phase(a,b):
+def angle_and_phase(a, b):
+    if abs(b) < 1e-15:
+        return 0.0, 0.0
+
     theta = np.atan2(abs(b), abs(a))
-    phi = np.angle(b) - np.angle(a)
+    phi = np.pi + np.angle(a) - np.angle(b)
     return theta, phi
 
 def Gevins_zero(U, i, j, theta, phi):
-    #U21,U31,U41 || U32,U42, ||U43
-    
-    ################################################################
-    ### Применяет вращение Гивенса к матрице U в плоскости (i,j).###
-    ################################################################
+    """
+    Применяет комплексное Givens-вращение в плоскости (i,j)
+    в каноничной форме:
+        [[ c,   -e^{i phi} s],
+         [ s,    e^{i phi} c]]
+    слева к матрице U.
+    """
+    N = U.shape[0]
+    G = np.eye(N, dtype=complex)
 
-    G = np.eye(U.shape[0], dtype=complex)
+    c = np.cos(theta)
+    s = np.sin(theta)
+    e = np.exp(1j * phi)
 
-    G[i,i] = np.cos(theta) * np.exp(1j*phi)
-    G[i,j] = -np.sin(theta) * np.exp(1j*phi)
-    G[j,i] = np.sin(theta) * np.exp(-1j*phi)
-    G[j,j] = np.cos(theta) * np.exp(-1j*phi)
+    G[i, i] = c
+    G[i, j] = -e * s
+    G[j, i] = s
+    G[j, j] = e * c
+
     return G @ U
 
+def givens_block(theta, phi):
+    c = np.cos(theta)
+    s = np.sin(theta)
+    e = np.exp(1j * phi)
+    return np.array([[c,        -e * s],
+                     [s,   e * c     ]], dtype=complex)
+
+def givens_block_dagger(theta, phi):
+    c = np.cos(theta)
+    s = np.sin(theta)
+    e = np.exp(-1j * phi)
+    return np.array([[c,        s       ],
+                     [-e * s,   e * c   ]], dtype=complex)
+
 def decompose(W):
-    params = {'thetas': [], 'phi_givens': [], 'phi_diag': []}
+    N = W.shape[0]
+    U = W.copy()
 
-    w_SHAPE = W.shape[0]
-    U = W.copy()  # работаем с копией
+    thetas = []
+    phi_givens = []
 
-    for col in range(w_SHAPE-1):
-        for row in range(col+1, w_SHAPE):
+    # Проход по поддиагональным элементам, как раньше
+    for col in range(N - 1):
+        for row in range(col + 1, N):
             if abs(U[row, col]) > 1e-12:
                 theta, phi = angle_and_phase(U[col, col], U[row, col])
-                params['thetas'].append((theta, phi, col, row))  # см. п.2
-                params['phi_givens'].append(phi)
-                U = Gevins_zero(U, col, row, theta, phi)
 
-    diag_phases = [cmath.phase(U[i, i]) for i in range(w_SHAPE)]
-    params['phi_diag'] = diag_phases
+                # сохраняем параметры G (не G†)
+                thetas.append((theta, phi, col, row))
+                phi_givens.append(phi)
 
-    return params
+                # строим G† и умножаем справа: U = U @ G†
+                Gd = np.eye(N, dtype=complex)
+                Gb = givens_block_dagger(theta, phi)
 
-def assemble_wmesh(theta, phases):
+                i, j = col, row
+                Gd[i, i] = Gb[0, 0]
+                Gd[i, j] = Gb[0, 1]
+                Gd[j, i] = Gb[1, 0]
+                Gd[j, j] = Gb[1, 1]
+
+                U = U @ Gd
+
+    # Теперь U ≈ D (диагональная фаза)
+    phi_diag = [cmath.phase(U[i, i]) for i in range(N)]
+
+    return {
+        'thetas': thetas,
+        'phi_givens': phi_givens,
+        'phi_diag': phi_diag,
+    }
+
+def assemble_from_dagger(thetas, phases):
     N = len(phases)
-    phases = np.array(phases)          # ← добавляем
-    D = np.diag(np.exp(1j * phases))
+    D = np.diag(np.exp(1j * np.array(phases)))
     W = D.copy()
-    for theta, phi, lr, tr in reversed(theta):
-        T_H = np.eye(N, dtype=complex)
-        cos_theta, sin_theta = np.cos(theta), np.sin(theta)
-        T_H[lr, lr] = cos_theta
-        T_H[lr, tr] = sin_theta
-        T_H[tr, lr] = -np.exp(-1j*phi) * sin_theta
-        T_H[tr, tr] = np.exp(-1j*phi) * cos_theta
-        W = T_H @ W
+
+    for theta, phi, i, j in thetas:
+        c = np.cos(theta)
+        s = np.sin(theta)
+        e = np.exp(-1j * phi)
+
+        G_dag = np.eye(N, dtype=complex)
+        G_dag[i, i] = c
+        G_dag[i, j] = s
+        G_dag[j, i] = -e * s
+        G_dag[j, j] = e * c
+
+        W = G_dag @ W
+
     return W
 
 def fmt(x, ndigits=6):
