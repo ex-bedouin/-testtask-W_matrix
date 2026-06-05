@@ -88,6 +88,27 @@ if __name__ == '__main__':
         Wmesh = assemble_wmesh(params['thetas'], params['phi_diag'])
         error = norm(W_noisy - Wmesh)
         print(f"Ошибка восстановления для шумной матрицы: {error:.4e}")
+        ### test random noise but still unitary
+        np.random.seed(0)
+
+        W0 = unitary_group.rvs(4)
+        sigmas = [1e-8, 1e-6, 1e-4, 1e-2]
+        
+        for sigma in sigmas:
+            noise = sigma * (np.random.randn(4, 4) + 1j*np.random.randn(4, 4))
+            A = W0 + noise
+        
+            Q, R = np.linalg.qr(A)
+            D = np.diag(np.exp(1j * np.angle(np.diag(R))))
+            W_test = Q @ D
+        
+            params = decompose(W_test)
+            Wmesh = assemble_wmesh(params['thetas'], params['phi_diag'])
+        
+            rec_error = norm(W_test - Wmesh)
+            unitary_error = norm(W_test @ W_test.conj().T - np.eye(4))
+        
+            print(f"sigma={sigma:.0e} | rec_error={rec_error:.4e} | unitary_error={unitary_error:.4e}")
     else:
         print("W унитарна")
         raise ValueError("А не унитарная")
