@@ -74,17 +74,20 @@ if __name__ == '__main__':
 
         ### test random noise
         np.random.seed(0)
-        random_matrix = np.random.randn(4,4) + 1j*np.random.randn(4,4)
-        W = W+random_matrix
 
-        params = decompose(W)
+        W0 = unitary_group.rvs(4)
+        sigma = 1e-4
+        noise = sigma * (np.random.randn(4, 4) + 1j * np.random.randn(4, 4))
+        W_noisy = W0 + noise
+        
+        params = decompose(W_noisy)
         print("Углы θ:", params['thetas'])
         print("Фазы вращений φ:", params['phi_givens'])
         print("Диагональные фазы φ:", params['phi_diag'])
-
-        Wmesh = assemble_wmesh(params['thetas'], params['phis_diag'])
-        error = norm(W - Wmesh)
-        print(f"Ошибка восстановления c доп шумом: {error:.4e}")
+        
+        Wmesh = assemble_wmesh(params['thetas'], params['phi_diag'])
+        error = norm(W_noisy - Wmesh)
+        print(f"Ошибка восстановления для шумной матрицы: {error:.4e}")
     else:
         print("W унитарна")
         raise ValueError("А не унитарная")
