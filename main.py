@@ -24,24 +24,22 @@ def Gevins_zero(U, i, j, theta, phi):
     return G @ U
 
 def decompose(W):
-    # Параметризация в терминах углов и фаз
     params = {'thetas': [], 'phi_givens': [], 'phi_diag': []}
 
     w_SHAPE = W.shape[0]
-    # Последовательное обнуление элементов
-    # (1,2), (1,3), (1,4), (2,3), (2,4), (3,4))
+    U = W.copy()  # работаем с копией
+
     for col in range(w_SHAPE-1):
         for row in range(col+1, w_SHAPE):
-            if abs(W[row, col]) > 1e-12:
-                theta, phi = angle_and_phase(W[col, col], W[row, col])
-                params['thetas'].append(theta)
+            if abs(U[row, col]) > 1e-12:
+                theta, phi = angle_and_phase(U[col, col], U[row, col])
+                params['thetas'].append((theta, phi, col, row))  # см. п.2
                 params['phi_givens'].append(phi)
-                U = Gevins_zero(W, col, row, theta, phi)
-    
-    # Извлечение диагональных фаз
-    diag_phases = [cmath.phase(U[i,i]) for i in range(w_SHAPE)]
+                U = Gevins_zero(U, col, row, theta, phi)
+
+    diag_phases = [cmath.phase(U[i, i]) for i in range(w_SHAPE)]
     params['phi_diag'] = diag_phases
-    
+
     return params
 
 def assemble_wmesh(theta, phases):
