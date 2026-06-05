@@ -57,59 +57,71 @@ def assemble_wmesh(theta, phases):
         W = T_H @ W
     return W
 
+def fmt(x, ndigits=6):
+    return f"{float(x):.{ndigits}f}"
+
+def print_params(params):
+    print("Givens-параметры:")
+    for k, (theta, phi, i, j) in enumerate(params['thetas'], start=1):
+        print(
+            f"  #{k:02d}  plane=({i},{j})  "
+            f"theta={fmt(theta)} rad  phi={fmt(phi)} rad"
+        )
+
+    print("\nДиагональные фазы:")
+    for i, phi in enumerate(params['phi_diag']):
+        print(f"  d[{i}] = exp(i*{fmt(phi)})")
+
 if __name__ == '__main__':
-    # Создаем унитарную матрицу 4x4
     W = unitary_group.rvs(4)
-    # Проверяем, что матрица унитарна
     W_unitary_check = W @ W.conj().T
+
     if np.allclose(W_unitary_check, np.eye(4), atol=1e-12):
+        print("=== Исходная матрица ===")
         print("W унитарна")
+
         params = decompose(W)
-        print("Углы θ:", params['thetas'])
-        print("Фазы вращений φ:", params['phi_givens'])
-        print("Диагональные фазы φ:", params['phi_diag'])
+        print_params(params)
 
         Wmesh = assemble_wmesh(params['thetas'], params['phi_diag'])
         error = norm(W - Wmesh)
-        print(f"Ошибка восстановления: {error:.4e}")
+        print(f"\nОшибка восстановления: {error:.4e}")
 
-        ### test random noise
         np.random.seed(0)
 
         W0 = unitary_group.rvs(4)
         sigma = 1e-4
         noise = sigma * (np.random.randn(4, 4) + 1j * np.random.randn(4, 4))
         W_noisy = W0 + noise
-        
+
+        print("\n=== Шумная матрица ===")
         params = decompose(W_noisy)
-        print("Углы θ:", params['thetas'])
-        print("Фазы вращений φ:", params['phi_givens'])
-        print("Диагональные фазы φ:", params['phi_diag'])
-        
+        print_params(params)
+
         Wmesh = assemble_wmesh(params['thetas'], params['phi_diag'])
         error = norm(W_noisy - Wmesh)
-        print(f"Ошибка восстановления для шумной матрицы: {error:.4e}")
-        ### test random noise but still unitary
+        print(f"\nОшибка восстановления для шумной матрицы: {error:.4e}")
+
+        print("\n=== Шумная, но снова унитарная матрица ===")
         np.random.seed(0)
 
         W0 = unitary_group.rvs(4)
         sigmas = [1e-8, 1e-6, 1e-4, 1e-2]
-        
+
         for sigma in sigmas:
             noise = sigma * (np.random.randn(4, 4) + 1j*np.random.randn(4, 4))
             A = W0 + noise
-        
+
             Q, R = np.linalg.qr(A)
             D = np.diag(np.exp(1j * np.angle(np.diag(R))))
             W_test = Q @ D
-        
+
             params = decompose(W_test)
             Wmesh = assemble_wmesh(params['thetas'], params['phi_diag'])
-        
+
             rec_error = norm(W_test - Wmesh)
             unitary_error = norm(W_test @ W_test.conj().T - np.eye(4))
-        
+
             print(f"sigma={sigma:.0e} | rec_error={rec_error:.4e} | unitary_error={unitary_error:.4e}")
     else:
-        print("W унитарна")
         raise ValueError("А не унитарная")
