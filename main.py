@@ -60,13 +60,9 @@ if __name__ == '__main__':
     # Создаем унитарную матрицу 4x4
     W = unitary_group.rvs(4)
     # Проверяем, что матрица унитарна
-    W_unitary_check = np.dot(W, W.conj().T) # = свойство унитарной матрицы, когда UxU* = I
-    W_unitary_check[W_unitary_check<1e-12] = 0
-    if int(np.real(W_unitary_check.sum())) == 4:
+    W_unitary_check = W @ W.conj().T
+    if np.allclose(W_unitary_check, np.eye(4), atol=1e-12):
         print("W унитарна")
-        # можно добавить следующую строчку, чтобы убрать машинный 0
-        # W[W<1e-12] = 0
-
         params = decompose(W)
         print("Углы θ:", params['thetas'])
         print("Фазы вращений φ:", params['phi_givens'])
@@ -83,12 +79,12 @@ if __name__ == '__main__':
 
         params = decompose(W)
         print("Углы θ:", params['thetas'])
-        print("Фазы вращений φ:", params['phis_givens'])
-        print("Диагональные фазы φ:", params['phis_diag'])
+        print("Фазы вращений φ:", params['phi_givens'])
+        print("Диагональные фазы φ:", params['phi_diag'])
 
         Wmesh = assemble_wmesh(params['thetas'], params['phis_diag'])
         error = norm(W - Wmesh)
         print(f"Ошибка восстановления c доп шумом: {error:.4e}")
-
     else:
-        raise ValueError('А не унитарная')
+        print("W унитарна")
+        raise ValueError("А не унитарная")
