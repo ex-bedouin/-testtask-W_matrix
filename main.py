@@ -44,6 +44,7 @@ def decompose(W):
 
 def assemble_wmesh(theta, phases):
     N = len(phases)
+    phases = np.array(phases)          # ← добавляем
     D = np.diag(np.exp(1j * phases))
     W = D.copy()
     for theta, phi, lr, tr in reversed(theta):
