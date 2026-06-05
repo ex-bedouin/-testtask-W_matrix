@@ -54,13 +54,11 @@ def decompose(W):
     thetas = []
     phi_givens = []
 
-    # Проход по поддиагональным элементам, как раньше
+    # Проход по поддиагональным элементам
     for col in range(N - 1):
         for row in range(col + 1, N):
             if abs(U[row, col]) > 1e-12:
                 theta, phi = angle_and_phase(U[col, col], U[row, col])
-
-                # сохраняем параметры G (не G†)
                 thetas.append((theta, phi, col, row))
                 phi_givens.append(phi)
 
@@ -76,7 +74,6 @@ def decompose(W):
 
                 U = U @ Gd
 
-    # Теперь U ≈ D (диагональная фаза)
     phi_diag = [cmath.phase(U[i, i]) for i in range(N)]
 
     return {
